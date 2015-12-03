@@ -151,6 +151,9 @@
  *     'authmap'   => 'shared_',
  *   ),
  * @endcode
+ *
+ *
+ *
  * You can also use a reference to a schema/database as a prefix. This maybe
  * useful if your Drupal installation exists in a schema that is not the default
  * or you want to access several databases from the same code base at the same
