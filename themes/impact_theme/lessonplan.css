@@ -1,0 +1,55 @@
+/* 
+    Document   : style
+    Created on : Sep 11, 2014, 10:26:59 AM
+    Author     : Frank
+    Description:
+        future quest lesson plan template
+*/
+#block-menu-menu-lesson-plan-menu{ 
+font-size: 90%;
+width: 30%;
+float: left;
+-margin-left:-40px;
+}
+#block-menu-menu-lesson-plan-menu ul{font-size:16px;margin: 0 3%;} 
+
+
+#block-menu-menu-lesson-plan-menu ul li.leaf{
+    list-style: none outside none;
+}
+
+
+#block-menu-menu-lesson-plan-menu li a.active{
+    color: #333;
+    -background: url('images/nav-active-arrow.png') no-repeat scroll right center transparent;
+    font-weight: bolder;
+}
+#block-menu-menu-lesson-plan-menu li a:hover{
+    color: #333;
+    -background: url('images/nav-active-arrow.png') no-repeat scroll right center transparent;
+}
+
+#lessonplan-content{width:70%;float:right;margin-bottom: 1em;}
+#lessonplan-content h3{margin-bottom: .25em;}
+#lessonplan-content ul {margin: 0 3%;}
+
+#lessonplan-content ul li{
+    list-style: none outside none;
+    margin-bottom: .75em;
+}
+#lessonplan-content ul li h6{
+    background-color: #6ad1f2;
+    color: #ffffff;
+    font-size: 18px;
+    padding-left: 5px;   
+}
+
+@media screen and (max-width: 767px)
+{
+    #block-menu-menu-lesson-plan-menu{ 
+    font-size: 100% !important;
+    width: 30%;
+    float: left;
+    }
+    #lessonplan-content{width:70%;float:right;}
+}

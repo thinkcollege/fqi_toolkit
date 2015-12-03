@@ -1,0 +1,48 @@
+/* 
+    Document   : style
+    Created on : Sep 11, 2014, 10:26:59 AM
+    Author     : Frank
+    Description:
+        future quest lesson plan template
+*/
+   div#block-menu-menu-lesson-plan-menu ul { width: 100%; margin: 0; padding: 0;list-style: none; display: block; }
+ div#block-menu-menu-lesson-plan-menu ul li { list-style: none; float: left; display: block;  text-align: center; border: 1px solid #777777; border-width: 1px 1px 0 1px; background-color: #CECECE; color: #0075AD;  -webkit-border-top-left-radius: 15px;
+  -webkit-border-top-right-radius: 15px;
+  -moz-border-radius-topleft: 15px;
+  -moz-border-radius-topright: 15px;
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px; 
+  margin: 0 2px;
+}
+ div#block-menu-menu-lesson-plan-menu ul li:hover { background-color: #fff;}
+ div#block-menu-menu-lesson-plan-menu ul li a { display: block; padding: 5px; text-decoration: none;
+ -webkit-border-top-left-radius: 15px;
+   -webkit-border-top-right-radius: 15px;
+   -moz-border-radius-topleft: 15px;
+   -moz-border-radius-topright: 15px;
+   border-top-left-radius: 15px;
+   border-top-right-radius: 15px; 
+ }
+  div#block-menu-menu-lesson-plan-menu ul li a:hover { text-decoration: underline;}
+ div#block-menu-menu-lesson-plan-menu ul li.active-trail { background-color: #fff; color: #00002D; }
+div#block-menu-menu-lesson-plan-menu ul.menu li a.active, div#block-menu-menu-lesson-plan-menu ul.menu li a.active-trail { color: #fff;    background-color: #429dd1; }
+
+div#block-menu-menu-lesson-plan-menu.block { padding: 0; }
+
+
+
+
+#lessonplan-content h3{margin-bottom: .25em;}
+#lessonplan-content ul {margin: 0 3%;}
+
+#lessonplan-content ul li{
+    list-style: none outside none;
+    margin-bottom: .75em;
+}
+#lessonplan-content ul li h5{
+    background-color: #c2c2c2;
+    color: #000;
+    font-size: 18px;
+    padding-left: 5px;   
+}
+

@@ -1,0 +1,287 @@
+<?php 
+
+function teacheradmin_permission() {
+  return array(
+    'teacheradmin module' => array(
+      'title' => t('Teacheradmin module permission'),
+  ));
+}
+
+
+
+function teacheradmin_menu() {
+  $items['teacher/admin'] = array(
+    'title' => 'List Students',
+    'page callback' => 'teacheradmin_list_students',
+     'access arguments' => array('teacheradmin module'),
+//    'access callback' => TRUE,
+	 
+  );
+  $items['teacher/dlsurveys/%'] = array(
+    'title' => t('Download Survey Results'),
+    'page callback' => 'teacheradmin_csvOut' ,
+    'page arguments' =>  array(2),
+     'access callback' => TRUE,
+ //   'weight' => 6,
+  );
+  return $items;
+}
+/**
+ * Read from the database using a filter array.
+ *
+ * In Drupal 6, the standard function to perform reads was db_query(), and
+ * for static queries, it still is.
+ *
+ * db_query() used an SQL query with placeholders and arguments as parameters.
+ *
+ * @code
+ *  // Old way
+ *  $query = "SELECT * FROM {dbtng_example} n WHERE n.uid = %d AND name = '%s'";
+ *  $result = db_query($query, $uid, $name);
+ * @endcode
+ *
+ * Drupal 7 DBTNG provides an abstracted interface that will work with a wide
+ * variety of database engines.
+ *
+ * db_query() is deprecated except when doing a static query. The following is
+ * perfectly acceptable in Drupal 7. See
+ * @link http://drupal.org/node/310072 the handbook page on static queries @endlink
+ *
+ * @code
+ *   // SELECT * FROM {dbtng_example} WHERE uid = 0 AND name = 'John'
+ *   db_query(
+ *     "SELECT * FROM {dbtng_example} WHERE uid = :uid and name = :name",
+ *     array(':uid' => 0, ':name' => 'John')
+ *   )->execute();
+ * @endcode
+ *
+ * But for more dynamic queries, Drupal provides the db_select()
+ * API method, so there are several ways to perform the same SQL query.
+ * See the @link http://drupal.org/node/310075 handbook page on dynamic queries. @endlink
+ *
+ * @code
+ *   // SELECT * FROM {dbtng_example} WHERE uid = 0 AND name = 'John'
+ *   db_select('dbtng_example')
+ *     ->fields('dbtng_example')
+ *     ->condition('uid', 0)
+ *     ->condition('name', 'John')
+ *     ->execute();
+ * @endcode
+ *
+ * Here is db_select with named placeholders:
+ * @code
+ *   // SELECT * FROM {dbtng_example} WHERE uid = 0 AND name = 'John'
+ *   $arguments = array(':name' => 'John', ':uid' => 0);
+ *   db_select('dbtng_example')
+ *     ->fields('dbtng_example')
+ *     ->where('uid = :uid AND name = :name', $arguments)
+ *     ->execute();
+ * @endcode
+ *
+ * Conditions are stacked and evaluated as AND and OR depending on the type of
+ * query. For more information, read the conditional queries handbook page at:
+ * http://drupal.org/node/310086
+ *
+ * The condition argument is an 'equal' evaluation by default, but this can be
+ * altered:
+ * @code
+ *   // SELECT * FROM {dbtng_example} WHERE age > 18
+ *   db_select('dbtng_example')
+ *     ->fields('dbtng_example')
+ *     ->condition('age', 18, '>')
+ *     ->execute();
+ * @endcode
+ *
+ * @param $entry
+ *   An array containing all the fields used to search the entries in the table.
+ * @return
+ *   An object containing the loaded entries if found.
+ *
+ * @see db_select()
+ * @see db_query()
+ * @see http://drupal.org/node/310072
+ * @see http://drupal.org/node/310075
+ *
+ */
+function dbtng_example_entry_load($entry = array()) {
+  // Read all fields from the dbtng_example table.
+  $select = db_select('dbtng_example', 'example');
+  $select->fields('example');
+
+  // Add each field and value as a condition to this query.
+  foreach ($entry as $field => $value) {
+    $select->condition($field, $value);
+  }
+  // Return the result in object format.
+  return $select->execute()->fetchAll();
+}
+
+/**
+ * Render a filtered list of entries in the database.
+ *
+ * DBTNG also helps processing queries that return several rows, providing the
+ * found objects in the same query execution call.
+ *
+ * This function queries the database using a JOIN between users table and the
+ * example entries, to provide the username that created the entry, and creates
+ * a table with the results, processing each row.
+ *
+ * SELECT
+ *  e.pid as pid, e.name as name, e.surname as surname, e.age as age
+ *  u.name as username
+ * FROM
+ *  {dbtng_example} e
+ * JOIN
+ *  users u ON e.uid = u.uid
+ * WHERE
+ *  e.name = 'John' AND e.age > 18
+ *
+ * @see db_select()
+ * @see http://drupal.org/node/310075
+ */
+function teacheradmin_list_students() {
+  $build = '';
+db_set_active('fqi_site');
+  $select = db_select('users', 'u');
+  // Join the users table, so we can get the entry creator's username.
+ // $select->join('users', 'u', 'e.uid = u.uid');
+  // Select these specific fields for the output.
+  $select->addField('u', 'username');
+  $select->addField('u', 'fname');
+  $select->addField('u', 'lname');
+  $select->addField('u', 'role');
+
+  // Filter only persons named "John".
+//  $select->condition('e.name', 'John');
+  // Filter only persons older than 18 years.
+//  $select->condition('e.age', 18, '>');
+  // Make sure we only get items 0-49, for scalability reasons.
+//  $select->range(0, 50);
+
+  // Now, loop all these entries and show them in a table. Note that there is no
+  // db_fetch_* object or array function being called here. Also note that the
+  // following line could have been written as
+  // $entries = $select->execute()->fetchAll() which would return each selected
+  // record as an object instead of an array.
+  $entries = $select->execute()->fetchAll(PDO::FETCH_ASSOC);
+  if (!empty($entries)) {
+    $rows = array();
+	 db_set_active('default');
+    foreach ($entries as $entry) {
+      // Sanitize the data before handing it off to the theme layer.
+      $rows[] = array_map('check_plain', $entry);
+    }
+    // Make a table for them.
+    $header = array(t('Username'), t('First Name'), t('Last Name'), t('Role'));
+ //   $output .= theme('table', array('header' => $header, 'rows' => $rows));
+   $build['teacheradmin_table'] = array(
+     '#theme' => 'table',
+     '#header' => $header,
+     '#rows' => $rows,
+   );
+
+  
+
+  }
+  else {
+    drupal_set_message(t('No entries meet the filter criteria (Name = "John" and Age > 18).'));
+  }
+/*  global $user;
+$uid = $user->uid;
+  $user_full = user_load($user->uid); // user_load(uid) returns the complete array
+  var_dump($user_full); */
+ global $user;
+ $user_wrapper = entity_metadata_wrapper('user', $user);
+ drupal_set_message('<pre>'.var_export($user_wrapper->field_class_code->raw(),1).'</pre>'); // Raw value
+ drupal_set_message('<pre>'.var_export($user_wrapper->field_class_code->value(),1).'</pre>'); // Loaded value
+ return $build;
+ }
+ 
+ function teacheradmin_csvOut($firstparameter = '') {
+ini_set('display_errors', 1);
+ini_set("auto_detect_line_endings", true);
+ error_reporting(E_ALL);
+ 
+ db_set_active('fqi_site');
+
+
+ $query = "select name from surveys where id = $firstparameter"; 
+ 
+
+ 	$titlearray = db_query($query)->fetchField();
+ $title = str_ireplace("_","",$titlearray);
+
+
+ $query2 = "select group_concat(distinct survey_responses.user ORDER BY user SEPARATOR ',') from survey_responses left join survey_questions on survey_responses.question = survey_questions.id where survey_questions.survey = $firstparameter"; 
+ 
+ 
+ $result2 = db_query($query2);
+ 
+ $row = $result2->fetchField();
+db_set_active('default');
+
+   $userarray = explode(',',$row);
+echo "Userarray: "; print_r($userarray); echo "<br />";
+ $arraynum_users = count($userarray);
+echo "Arraynum users: $arraynum_users<br />";
+ $query3 = "select group_concat( distinct id order by id SEPARATOR ',') from survey_questions where survey = $firstparameter ORDER BY id";
+ db_set_active('fqi_site');
+ $result2 = db_query($query3)->fetchField();
+echo "Result2: $result2 <br />";
+ db_set_active('default');
+ $num_fields_ques = count($result2); 
+
+ $quesarray = explode(',', $result2);
+ Echo "Quesarray: "; print_r($quesarray); echo "<br />";
+  $arraynum_ques = count($quesarray);
+echo "Arraynum Ques: $arraynum_ques <br />";
+  $headers = array('Student ID.','Student Name','Class code');
+  $userresponses = array();
+// $fp = fopen('php://output', 'w'); 
+//  header('Content-Type: text/csv');
+//  header('Content-Disposition: attachment; filename="results_' . $title . '.csv"');
+//  header('Pragma: no-cache');    
+//  header('Expires: 0');
+  $query4 = "select 'Response ID',concat(text,' (ques. ID: ', id , ')') concatid from survey_questions where survey = $firstparameter order by id"; 
+ db_set_active('fqi_site');
+  $result3 = db_query($query4);
+  
+  while ($headersrow = $result3->fetchAll(PDO::FETCH_ASSOC)){
+ 	 foreach($headersrow as $key => $value) {$headers[]= $value['Response ID'];
+  $headers[]= $value['concatid'];}
+
+ } 
+echo "Headers: "; print_r($headers); echo "<br />";
+  // fputcsv($fp, array_values($headers));
+ for($i = 0 ; $i < $arraynum_users; $i++) {
+
+ 	$user = $userarray[$i];
+ 	$induser = array($user);
+ 	$query4 ="SELECT concat(users.fname, ' ', users.lname) wholename, codes.code from users left join codes on users.code = codes.id where users.id = $user";
+   
+    $response5 = db_query($query4);
+ 	while ($row5 = $response5->fetchAll(PDO::FETCH_ASSOC)){ $induser[]= $row5[0]['wholename']; $induser[]= $row5[0]['code'];
+   print_r($induser); echo "<br />";}
+ for($j = 0 ; $j < $arraynum_ques; $j++) {
+ 	$ques = $quesarray[$j];
+
+ $query5 = "select count(survey_answers.id) countanswer,survey_answers.id,survey_answers.text from survey_responses left join survey_answers on survey_responses.answer = survey_answers.id where survey_responses.user = $user and survey_responses.question = $ques ORDER BY question";
+$response6 = db_query($query5);
+
+  while ($row6 = $response6->fetchAll(PDO::FETCH_ASSOC)){
+  
+ 	 foreach($row6 as $key => $value) {
+ 	 if ($value['countanswer'] == 0) {
+ 		 $value['id'] = '';
+ 		 $value['text'] = ''; }
+  $induser[]= $value['id'];
+  $induser[]= $value['text'];
+  } }
+  }
+ echo "Induser: "; print_r($induser); echo "<br />";
+ //fputcsv($fp, array_values($induser)); 
+ // $userresponses []= $induser;
+  }
+  db_set_active('default');
+ die;
+ }

@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the fqi_toolkit_types feature.
+ */
+
+include_once 'fqi_toolkit_types.features.inc';

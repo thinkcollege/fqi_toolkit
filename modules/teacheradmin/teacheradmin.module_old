@@ -1,0 +1,723 @@
+<?php 
+
+function teacheradmin_permission() {
+  return array(
+    'teacheradmin module' => array(
+      'title' => t('Teacheradmin module permission'),
+  ));
+}
+
+
+
+function teacheradmin_menu() {
+  $items['teacher/admin'] = array(
+    'title' => 'List Students',
+    'page callback' => 'teacheradmin_list_students',
+     'access arguments' => array('teacheradmin module'),
+//    'access callback' => TRUE,
+	 
+  );
+  $items['teacher/dlsurveys/%'] = array(
+    'title' => t('Download Survey Results'),
+    'page callback' => 'teacheradmin_csvOut' ,
+    'page arguments' =>  array(2),
+     'access callback' => TRUE,
+ //   'weight' => 6,
+  );
+  
+  $items['teacher/results'] = array(
+    'title' => 'Students',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('teacheradmin_dependent_dropdown_degrades'),
+    'access callback' => TRUE,
+   
+  );
+  $items['student/activity/%/%'] = array(
+    'title' => 'Student Activity',
+    'page callback' => 'teacheradmin_student_activity',
+    'page arguments' => array(2,3),
+    'access callback' => TRUE,
+   
+  );
+  $items['teacher/addclasses'] = array(
+    'title' => 'Add Classes',
+    'page callback' => 'drupal_get_form',
+ 'page arguments' => array('teacheradmin_add_classes'),
+    'access callback' => TRUE,
+   
+  );
+  return $items;
+}
+/**
+ * Read from the database using a filter array.
+ *
+ * In Drupal 6, the standard function to perform reads was db_query(), and
+ * for static queries, it still is.
+ *
+ * db_query() used an SQL query with placeholders and arguments as parameters.
+ *
+ * @code
+ *  // Old way
+ *  $query = "SELECT * FROM {dbtng_example} n WHERE n.uid = %d AND name = '%s'";
+ *  $result = db_query($query, $uid, $name);
+ * @endcode
+ *
+ * Drupal 7 DBTNG provides an abstracted interface that will work with a wide
+ * variety of database engines.
+ *
+ * db_query() is deprecated except when doing a static query. The following is
+ * perfectly acceptable in Drupal 7. See
+ * @link http://drupal.org/node/310072 the handbook page on static queries @endlink
+ *
+ * @code
+ *   // SELECT * FROM {dbtng_example} WHERE uid = 0 AND name = 'John'
+ *   db_query(
+ *     "SELECT * FROM {dbtng_example} WHERE uid = :uid and name = :name",
+ *     array(':uid' => 0, ':name' => 'John')
+ *   )->execute();
+ * @endcode
+ *
+ * But for more dynamic queries, Drupal provides the db_select()
+ * API method, so there are several ways to perform the same SQL query.
+ * See the @link http://drupal.org/node/310075 handbook page on dynamic queries. @endlink
+ *
+ * @code
+ *   // SELECT * FROM {dbtng_example} WHERE uid = 0 AND name = 'John'
+ *   db_select('dbtng_example')
+ *     ->fields('dbtng_example')
+ *     ->condition('uid', 0)
+ *     ->condition('name', 'John')
+ *     ->execute();
+ * @endcode
+ *
+ * Here is db_select with named placeholders:
+ * @code
+ *   // SELECT * FROM {dbtng_example} WHERE uid = 0 AND name = 'John'
+ *   $arguments = array(':name' => 'John', ':uid' => 0);
+ *   db_select('dbtng_example')
+ *     ->fields('dbtng_example')
+ *     ->where('uid = :uid AND name = :name', $arguments)
+ *     ->execute();
+ * @endcode
+ *
+ * Conditions are stacked and evaluated as AND and OR depending on the type of
+ * query. For more information, read the conditional queries handbook page at:
+ * http://drupal.org/node/310086
+ *
+ * The condition argument is an 'equal' evaluation by default, but this can be
+ * altered:
+ * @code
+ *   // SELECT * FROM {dbtng_example} WHERE age > 18
+ *   db_select('dbtng_example')
+ *     ->fields('dbtng_example')
+ *     ->condition('age', 18, '>')
+ *     ->execute();
+ * @endcode
+ *
+ * @param $entry
+ *   An array containing all the fields used to search the entries in the table.
+ * @return
+ *   An object containing the loaded entries if found.
+ *
+ * @see db_select()
+ * @see db_query()
+ * @see http://drupal.org/node/310072
+ * @see http://drupal.org/node/310075
+ *
+ */
+
+function teacheradmin_student_activity($firstparameter="",$secondparameter="")
+{
+ $teacherinfo = _teacheradmin_teacherinfo();
+   $build = '';
+ db_set_active('fqi_site');
+ 
+/* select sur.name, CONCAT(u.fname, ' ', u.lname) Name, sq.text, sa.text, sr.updated from survey_responses sr left join survey_questions sq on sq.id = sr.question left join survey_answers sa on sr.answer = sa.id left join users u on sr.user = u.id left join surveys sur on sq.survey = sur.id where sq.survey = 4 and sr.user = 45 order by sr.updated,sq.id; */
+ 
+  $query = db_select('survey_responses', 'sr');
+  $query->leftJoin('survey_questions', 'sq','sq.id = sr.question');
+  $query->leftJoin('survey_answers', 'sa', 'sr.answer = sa.id');
+   $query->leftJoin('users', 'u', 'sr.user = u.id');
+   $query->leftJoin('surveys', 'sur', 'sq.survey = sur.id');
+ 
+  $query->addField('sur','name','surname');
+  $query->addExpression("CONCAT(u.fname, ' ', u.lname)",'Name');
+  $query->addField('sr','user', 'suruser');
+  $query->addField('sq','text', 'questiontext');
+  $query->addField('sa','text', 'answertext');
+  $query->addField('sr','updated', 'activitytime');
+  $query->condition('sq.survey', $secondparameter);
+  $query->condition('sr.user', $firstparameter);
+  $query->orderBy('activitytime')
+  ->orderBy('sq.id');
+ 
+
+
+  
+   $entries = $query->execute()->fetchAll(PDO::FETCH_ASSOC);
+   if (!empty($entries)) {
+     $rows = array();
+     $newarray= array();
+ 	 db_set_active('default');
+     foreach ($entries as $entry) {
+       // Sanitize the data before handing it off to the theme layer.
+       $rows[] = array_map('check_plain', $entry);
+     }
+   
+     $rownum = count($rows);
+     $surveyname = $rows[0]['surname'];
+     $studentname = $rows[0]['Name'];
+     for($i= 0 ; $i < $rownum; $i++ ) 
+     {
+    
+    
+   unset($rows[$i]['surname']);
+   unset($rows[$i]['Name']);
+
+   unset($rows[$i]['suruser']);
+    }
+   
+  //print_r($rows);
+     // Make a table for them.
+     $header = array(t('Question'), t('Answer'),  t('Activity Time'));
+  //   $output .= theme('table', array('header' => $header, 'rows' => $rows));
+  $build['toptext'] = array(
+    t('Student Activity')  => array(
+      '#markup' => "<h2>$studentname</h2><h3><strong>$surveyname</h3>"),
+    );
+    $build['teacheradmin_table'] = array(
+      '#theme' => 'table',
+      '#header' => $header,
+      '#rows' => $rows,
+    );
+
+   $build['sometext'] = array(
+     t('Class Id')  => array(
+       '#markup' => "<p><strong>" . $teacherinfo['teachername'] . " -- Class: " . $teacherinfo['classname'] .  " -- School: " . $teacherinfo['schoolname'] . "</strong></p>"),
+     );
+
+   }
+   else {
+     drupal_set_message(t('No entries meet the filter criteria (Name = "John" and Age > 18).'));
+   }
+
+
+ 
+ 
+  return $build;
+
+ 
+}
+
+function _teacheradmin_teacherinfo() {
+ global $user;
+ $teacherinfo = array();
+ $user_wrapper = entity_metadata_wrapper('user', $user);
+ $teachername = $user_wrapper->field_first_name->value() . " " . $user_wrapper->field_last_name->value();
+ $uid = $user->uid;
+ $classid = $user_wrapper->field_class_code->value();
+ $classname = $user_wrapper->field_class_information->value();
+ $schoolname = $user_wrapper->field_school_name->value();
+ $teacherinfo = array('uid' => $uid, 'teachername' => $teachername, 'classid' => $classid, 'classname' => $classname, 'schoolname' => $schoolname);
+ return $teacherinfo;
+ }
+
+
+/* function teacheradmin_add_classes_form_alter(&$form, &$form_state, $form_id){
+   if ($form_id == 'teacheradmin_add_classes'){
+
+      // Find the user obj
+      global $user;
+      // Load all profile fields
+      $account = user_load($user->uid);
+      
+   
+      $form['field_class_information']['value']['#default_value'] = $account->field_class_information['und'][0]['value'];
+   }
+} */
+
+
+/* function teacheradmin_add_classes_submit_form_alter($form, $form_alter){
+
+     // Find the user obj
+      global $user;
+      // Load all profile fields
+      $account = user_load($user->uid);
+     
+   
+  //    $classinformation = $user->field_class_information['und'][0]['value'];
+
+$account->field_class_information['und'][0]['value'] = 
+
+$form_state['values']['field_class_information'] ; 
+user_save($account); 
+
+user_save(
+  (object) array('uid' => $existingUser->uid),
+  $edit,
+  'Personal Information' // category
+);
+   
+} */
+
+
+
+/* function teacheradmin_add_classes($form, &$form_state) {
+   global $user;
+   // Load all profile fields
+   $account = user_load($user->uid);
+// print_r($account);
+  // echo $account->field_class_information['und'][0]['value'];
+  $form['field_class_information_0'] = array(
+    '#type' => 'textfield',
+    '#default_value' => $account->field_class_information['und'][0]['value'],
+    '#title' => t('Class 1 Information')
+  );
+ $form['field_class_code_0'] = array(
+   '#type' => 'textfield',
+   '#default_value' => $account->field_class_code['und'][0]['value'],
+   '#title' => t('Class 1 code')
+ );
+  $form['field_class_information_1'] = array(
+    '#type' => 'textfield',
+    '#default_value' => $account->field_class_information['und'][1]['value'],
+    '#title' => t('Class 2 Information')
+  );
+ $form['field_class_code_1'] = array(
+   '#type' => 'textfield',
+   '#default_value' => $account->field_class_code['und'][1]['value'],
+   '#title' => t('Class 2 code')
+ );
+  $form['field_class_information_2'] = array(
+    '#type' => 'textfield',
+    '#default_value' => $account->field_class_information['und'][2]['value'],
+    '#title' => t('Class 3 Information')
+  );
+ $form['field_class_code_2'] = array(
+   '#type' => 'textfield',
+   '#default_value' => $account->field_class_code['und'][2]['value'],
+   '#title' => t('Class 3 code')
+ );
+  $form['field_class_information_3'] = array(
+    '#type' => 'textfield',
+    '#default_value' => $account->field_class_information['und'][3]['value'],
+    '#title' => t('Class 4 Information')
+  );
+ $form['field_class_code_3'] = array(
+   '#type' => 'textfield',
+   '#default_value' => $account->field_class_code['und'][3]['value'],
+   '#title' => t('Class 4 code')
+ );
+  $form['field_class_information_4] = array(
+    '#type' => 'textfield',
+    '#default_value' => $account->field_class_information['und'][4]['value'],
+    '#title' => t('Class 5 Information')
+  );
+ $form['field_class_code_4'] = array(
+   '#type' => 'textfield',
+   '#default_value' => $account->field_class_code['und'][4]['value'],
+   '#title' => t('Class 5 code')
+ );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit your information'),
+  );
+
+  return $form;
+} 
+*/
+function teacheradmin_add_classes_submit($form, &$form_state) {
+        global $user;
+        // Load all profile fields
+        $account = user_load($user->uid);
+     
+        
+        $classinformation0 =$form_state['values']['field_class_information_0'];
+         $classinformation1 =$form_state['values']['field_class_information_1'];
+    $classinformation2 =$form_state['values']['field_class_information_2'];
+    $classinformation3 =$form_state['values']['field_class_information_3'];
+       $classinformation4 =$form_state['values']['field_class_information_4'];
+       
+      $classcode0 =$form_state['values']['field_class_code_0'];
+         $classcode1 =$form_state['values']['field_class_code_1'];
+       $classcode2 =$form_state['values']['field_class_code_2'];
+       $classcode3 =$form_state['values']['field_class_code_3'];
+     $classcode4 =$form_state['values']['field_class_code_4'];
+$account = user_load(array('uid' => $account->uid));
+$updates = array(
+    array('field_class_information' => array('und'=> array(0 => array('value' => $classinformation0),
+ array(1 => array('value' => $classinformation1),
+ array(2 => array('value' => $classinformation2),
+ array(3 => array('value' => $classinformation3),
+ array(4 => array('value' => $classinformation4),   
+    ))),
+    
+       array('field_class_code' => array('und'=> array(0 => array('value' => $classcode0),
+    array(1 => array('value' => $classcode1),
+    array(2 => array('value' => $classcode2),
+    array(3 => array('value' => $classcode3),
+    array(4 => array('value' => $classcode4),   
+       ))),
+    
+    );
+
+user_save($account, $updates);
+
+  
+  
+  drupal_set_message(t('Submitting values: @values', array('@values' => var_export($form_state['values'], TRUE))));
+  
+} 
+
+
+function teacheradmin_list_students() {
+
+
+
+ $teacherinfo = _teacheradmin_teacherinfo();
+ $classid = $teacherinfo['classid'];
+  $build = '';
+  db_set_active('default');
+db_set_active('fqi_site');
+ 
+ $sub_query = db_select('survey_responses', 'sr');
+ $sub_query->leftJoin('survey_questions', 'sq','sq.id = sr.question');
+ $sub_query->leftJoin('surveys', 'sur', 'sur.id = sq.survey');
+ $sub_query->distinct();
+ $sub_query->addField('sur','id','surid');
+ $sub_query->addField('sur','name','surname');
+ $sub_query->addField('sr','user', 'suruser');
+ db_set_active('default');
+ db_set_active('fqi_site');
+  $select = db_select('users', 'u');
+   $select->leftJoin('codes', 'c', 'u.code = c.id');
+  $select->leftJoin($sub_query, 'getname', 'getname.suruser = u.id');
+  // Select these specific fields for the output.
+  $select->distinct();
+  $select->addField('u', 'id');
+  $select->addField('u', 'username');
+  $select->addField('u', 'fname');
+  $select->addField('u', 'lname');
+  $select->addExpression("IFNULL(GROUP_CONCAT(getname.surname ORDER BY getname.surid SEPARATOR '|'), 'No activities')", "activities");
+ $select->addExpression("IFNULL(GROUP_CONCAT(getname.surid ORDER BY getname.surid SEPARATOR '|' ), '')", "surveyid");
+  $select->condition('c.code', $classid);
+   $select->condition('u.role', 'student');
+   $select->groupBy('username');
+// print $select;
+db_set_active('default');
+
+  // Now, loop all these entries and show them in a table. Note that there is no
+  // db_fetch_* object or array function being called here. Also note that the
+  // following line could have been written as
+  // $entries = $select->execute()->fetchAll() which would return each selected
+  // record as an object instead of an array.
+  $entries = $select->execute()->fetchAll(PDO::FETCH_ASSOC);
+  if (!empty($entries)) {
+    $rows = array();
+    $newarray= array();
+
+    foreach ($entries as $entry) {
+      // Sanitize the data before handing it off to the theme layer.
+      $rows[] = array_map('check_plain', $entry);
+    }
+   
+    $rownum = count($rows);
+    $actarray = "";
+    for($i= 0 ; $i < $rownum; $i++ ) 
+    {
+    
+   $usernum = $rows[$i]['id'];
+   
+  
+   if( $rows[$i]['activities'] != 'No activities' ) 
+  { $newarray = explode("|",$rows[$i]['activities']);
+  $idarray = explode("|",$rows[$i]['surveyid']);
+$rows[$i]['activities'] = "<ul>";
+ foreach ($newarray as $key => $value) {
+ $surveynum = $idarray[$key];
+ $rows[$i]['activities'].= "<li><a href=\"/toolkit/student/activity/$usernum/$surveynum\">$value</a></li>";
+ }
+ $rows[$i]['activities'].= "</ul>";
+   }
+  unset($rows[$i]['id']);
+  unset($rows[$i]['surveyid']);
+   }
+   
+ //print_r($rows);
+    // Make a table for them.
+    $header = array(t('Username'), t('First Name'), t('Last Name'), t('Activities'));
+ //   $output .= theme('table', array('header' => $header, 'rows' => $rows));
+   $build['teacheradmin_table'] = array(
+     '#theme' => 'table',
+     '#header' => $header,
+     '#rows' => $rows,
+   );
+
+  $build['sometext'] = array(
+    t('Class Id')  => array(
+      '#markup' => "<p><strong>" . $teacherinfo['teachername'] . " -- Class: " . $teacherinfo['classname'] .  " -- School: " . $teacherinfo['schoolname'] . "</strong></p>"),
+    );
+
+  }
+  else {
+    drupal_set_message(t('No entries meet the filter criteria (Name = "John" and Age > 18).'));
+  }
+
+
+ 
+ 
+ return $build;
+ }
+ 
+
+
+
+
+
+function _teacheradmin_get_first_dropdown_options() {
+  // drupal_map_assoc() just makes an array('String' => 'String'...).
+  return drupal_map_assoc(array(t('String'), t('Woodwind'), t('Brass'), t('Percussion')));
+}
+
+
+
+/**
+ * Helper function to populate the second dropdown. This would normally be
+ * pulling data from the database.
+ *
+ * @param $key
+ *   This will determine which set of options is returned.
+ *
+ * @return array of options
+ */
+function _teacheradmin_get_second_dropdown_options($key = '') {
+  $options = array(
+    t('String') => drupal_map_assoc(array(t('1'), t('2'), t('3'))),
+    t('Woodwind') => drupal_map_assoc(array(t('1'), t('2'), t('3'))),
+    t('Brass') => drupal_map_assoc(array(t('Trumpet'), t('Trombone'), t('French Horn'), t('Euphonium'))),
+    t('Percussion') =>drupal_map_assoc(array(t('1'), t('2'), t('3'))),
+  );
+  if (isset($options[$key])) {
+    return $options[$key];
+  }
+  else {
+    return array();
+  }
+}
+
+
+
+
+
+function teacheradmin_dependent_dropdown_degrades($form, &$form_state, $no_js_use = FALSE) {
+  // Get the list of options to populate the first dropdown.
+  $options_first = _teacheradmin_get_first_dropdown_options();
+
+  // If we have a value for the first dropdown from $form_state['values'] we use
+  // this both as the default value for the first dropdown and also as a
+  // parameter to pass to the function that retrieves the options for the
+  // second dropdown.
+  $selected = isset($form_state['values']['dropdown_first']) ? $form_state['values']['dropdown_first'] : key($options_first);
+
+  // Attach the CSS and JS we need to show this with and without javascript.
+  // Without javascript we need an extra "Choose" button, and this is
+  // hidden when we have javascript enabled.
+  $form['#attached']['css'] = array(
+    drupal_get_path('module', 'teacheradmin') . '/teacheradmin.css',
+  );
+  $form['#attached']['js'] = array(
+    drupal_get_path('module', 'teacheradmin') . '/teacheradmin.js',
+  );
+
+  $form['dropdown_first_fieldset'] = array(
+    '#type' => 'fieldset',
+  );
+  $form['dropdown_first_fieldset']['dropdown_first'] = array(
+    '#type' => 'select',
+    '#title' => 'Instrument Type',
+    '#options' => $options_first,
+    '#attributes' => array('class' => array('enabled-for-ajax')),
+
+    // The '#ajax' property allows us to bind a callback to the server whenever this
+    // form element changes. See teacheradmin_autocheckboxes and
+    // teacheradmin_dependent_dropdown in teacheradmin.module for more details.
+    '#ajax' => array(
+      'callback' => 'teacheradmin_dependent_dropdown_degrades_first_callback',
+      'wrapper' => 'dropdown-second-replace',
+    ),
+  );
+
+  // This simply allows us to demonstrate no-javascript use without
+  // actually turning off javascript in the browser. Removing the #ajax
+  // element turns off AJAX behaviors on that element and as a result
+  // ajax.js doesn't get loaded. This is for demonstration purposes only.
+  if ($no_js_use) {
+    unset($form['dropdown_first_fieldset']['dropdown_first']['#ajax']);
+  }
+
+  // Since we don't know if the user has js or not, we always need to output
+  // this element, then hide it with with css if javascript is enabled.
+  $form['dropdown_first_fieldset']['continue_to_second'] = array(
+    '#type' => 'submit',
+    '#value' => t('Choose'),
+    '#attributes' => array('class' => array('next-button')),
+  );
+
+  $form['dropdown_second_fieldset'] = array(
+    '#type' => 'fieldset',
+  );
+  $form['dropdown_second_fieldset']['dropdown_second'] = array(
+    '#type' => 'select',
+    '#title' => $options_first[$selected] . ' ' . t('Instruments'),
+    '#prefix' => '<div id="dropdown-second-replace">',
+    '#suffix' => '</div>',
+    '#attributes' => array('class' => array('enabled-for-ajax')),
+    // When the form is rebuilt during processing (either AJAX or multistep),
+    // the $selected variable will now have the new value and so the options
+    // will change.
+    '#options' => _teacheradmin_get_second_dropdown_options($selected),
+  );
+  $form['dropdown_second_fieldset']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('OK'),
+    // This class allows attached js file to override the disabled attribute,
+    // since it's not necessary in ajax-enabled form.
+    '#attributes' => array('class' => array('enabled-for-ajax')),
+  );
+
+  // Disable dropdown_second if a selection has not been made on dropdown_first.
+  if (empty($form_state['values']['dropdown_first'])) {
+    $form['dropdown_second_fieldset']['dropdown_second']['#disabled'] = TRUE;
+    $form['dropdown_second_fieldset']['dropdown_second']['#description'] = t('You must make your choice on the first dropdown before changing this second one.');
+    $form['dropdown_second_fieldset']['submit']['#disabled'] = TRUE;
+  }
+
+  return $form;
+}
+
+/**
+ * Submit function for teacheradmin_dependent_dropdown_degrades().
+ */
+function teacheradmin_dependent_dropdown_degrades_submit($form, &$form_state) {
+
+  // Now handle the case of the next, previous, and submit buttons.
+  // only submit will result in actual submission, all others rebuild.
+  switch ($form_state['triggering_element']['#value']) {
+    case t('OK'): // Submit: We're done.
+      drupal_set_message(t('Your values have been submitted. dropdown_first=@first, dropdown_second=@second', array('@first' => $form_state['values']['dropdown_first'], '@second' => $form_state['values']['dropdown_second'])));
+      $_SESSION['surveyno'] =  $form_state['storage']['dropdown_second'] = $form_state['values']['dropdown_second'];
+        $form_state['redirect'] = "teacher/admin";
+      return;
+  }
+  // 'Choose' or anything else will cause rebuild of the form and present
+  // it again.
+  $form_state['rebuild'] = TRUE;
+}
+
+/**
+ * Selects just the second dropdown to be returned for re-rendering.
+ *
+ * @return
+ *   Renderable array (the second dropdown).
+ */
+function teacheradmin_dependent_dropdown_degrades_first_callback($form, $form_state) {
+  return $form['dropdown_second_fieldset']['dropdown_second'];
+}
+
+
+
+
+
+
+
+
+
+
+
+
+ function teacheradmin_csvOut($firstparameter = '') {
+ini_set('display_errors', 1);
+ini_set("auto_detect_line_endings", true);
+ error_reporting(E_ALL);
+ 
+ db_set_active('fqi_site');
+
+
+ $query = "select name from surveys where id = $firstparameter"; 
+ 
+
+ 	$titlearray = db_query($query)->fetchField();
+ $title = str_ireplace("_","",$titlearray);
+
+
+ $query2 = "select group_concat(distinct survey_responses.user ORDER BY user SEPARATOR ',') from survey_responses left join survey_questions on survey_responses.question = survey_questions.id where survey_questions.survey = $firstparameter"; 
+ 
+ 
+ $result2 = db_query($query2);
+ 
+ $row = $result2->fetchField();
+db_set_active('default');
+
+   $userarray = explode(',',$row);
+ 
+ $arraynum_users = count($userarray);
+
+ $query3 = "select group_concat( distinct id order by id SEPARATOR ',') from survey_questions where survey = $firstparameter ORDER BY id";
+ db_set_active('fqi_site');
+ $result2 = db_query($query3)->fetchField();
+
+ db_set_active('default');
+ $num_fields_ques = count($result2); 
+
+ $quesarray = explode(',', $result2);
+  $arraynum_ques = count($quesarray);
+
+  $headers = array('Student ID.','Student Name','Class code');
+  $userresponses = array();
+ $fp = fopen('php://output', 'w'); 
+  header('Content-Type: text/csv');
+  header('Content-Disposition: attachment; filename="results_' . $title . '.csv"');
+  header('Pragma: no-cache');    
+  header('Expires: 0');
+  $query4 = "select 'Response ID',concat(text,' (ques. ID: ', id , ')') concatid from survey_questions where survey = $firstparameter order by id"; 
+ db_set_active('fqi_site');
+  $result3 = db_query($query4);
+  
+  while ($headersrow = $result3->fetchAll(PDO::FETCH_ASSOC)){
+ 	 foreach($headersrow as $key => $value) {$headers[]= $value['Response ID'];
+  $headers[]= $value['concatid'];}
+
+ } 
+
+ fputcsv($fp, array_values($headers));
+ for($i = 0 ; $i < $arraynum_users; $i++) {
+
+ 	$user = $userarray[$i];
+ 	$induser = array($user);
+ 	$query4 ="SELECT concat(users.fname, ' ', users.lname) wholename, codes.code from users left join codes on users.code = codes.id where users.id = $user";
+   
+    $response5 = db_query($query4);
+while ($row5 = $response5->fetchAll(PDO::FETCH_ASSOC)){ $induser[]= $row5[0]['wholename']; $induser[]= $row5[0]['code'];
+ }
+ for($j = 0 ; $j < $arraynum_ques; $j++) {
+ 	$ques = $quesarray[$j];
+
+ $query5 = "select count(survey_answers.id) countanswer,survey_answers.id,survey_answers.text from survey_responses left join survey_answers on survey_responses.answer = survey_answers.id where survey_responses.user = $user and survey_responses.question = $ques ORDER BY question";
+$response6 = db_query($query5);
+
+  while ($row6 = $response6->fetchAll(PDO::FETCH_ASSOC)){
+  
+ 	 foreach($row6 as $key => $value) {
+ 	 if ($value['countanswer'] == 0) {
+ 		 $value['id'] = '';
+ 		 $value['text'] = ''; }
+  $induser[]= $value['id'];
+  $induser[]= $value['text'];
+  } }
+  }
+ fputcsv($fp, array_values($induser)); 
+ // $userresponses []= $induser;
+  }
+  db_set_active('default');
+ die;
+ }

@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the toolkit_fields feature.
+ */
+
+include_once 'toolkit_fields.features.inc';
