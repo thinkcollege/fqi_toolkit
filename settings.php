@@ -54,6 +54,11 @@
 /**
  * Database settings:
  *
+ *
+ *
+ *
+ *
+ *
  * The $databases array specifies the database connection or
  * connections that Drupal may use.  Drupal is able to connect
  * to multiple databases, including multiple types of databases,
